@@ -31,9 +31,53 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
         // Using optional binding makes our code safer, more readable, and more explicit.
         if let userPickedimage = info[UIImagePickerController.InfoKey.originalImage] as? UIImage {
             imageView.image = userPickedimage
+            
+            // to adjust coreML
+            // use guard in order to make this code safer(In case of failing converting)
+            guard let ciimage = CIImage(image: userPickedimage) else {
+                fatalError("Could not convert to CIImage")
+            }
+            
+            detect(image: ciimage)
         }
         
         imagePicker.dismiss(animated: true, completion: nil)
+    }
+    
+    func detect(image: CIImage) {
+        
+        // This model is what we're going to be using to classfy our image
+        // try? is error handling(if an operation is succeed, then the result is going to be wrapped as an optional. if fail, the result is going to be nil.)
+        guard let model = try? VNCoreMLModel(for: Inceptionv3().model) else {
+            // use guard in order to send a message to debug console
+            fatalError("Loading CoreML Model Failed")
+        }
+        
+        let request = VNCoreMLRequest(model: model) { (request, error) in
+            guard let results = request.results as? [VNClassificationObservation] else {
+                fatalError("Model failed to process image")
+            }
+            
+            if let firstResult = results.first {
+                if firstResult.identifier.contains("hotdog") {
+                    self.navigationItem.title = "Hotdog!"
+                } else {
+                    self.navigationItem.title = "Not Hotdog!"
+                }
+            }
+        }
+        
+        let handler = VNImageRequestHandler(ciImage: image)
+        
+        // ! means that we're forcing it to execute this line
+        // try! handler.perform([request])
+        // more safe code is as follws
+        do {
+            try handler.perform([request])
+        }
+        catch {
+            print(error)
+        }
     }
 
     @IBAction func cameraTapped(_ sender: UIBarButtonItem) {
